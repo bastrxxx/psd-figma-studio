@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font: 12px/1.4 Inter, system-ui, sans-serif; margin: 0; padding: 14px; color: #222; }
+  h3 { margin: 0 0 8px; font-size: 14px; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; }
+  label { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
+  button { width: 100%; padding: 10px; border: 0; border-radius: 6px; background: #7c3aed; color: #fff; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #log { margin-top: 10px; white-space: pre-wrap; color: #555; max-height: 120px; overflow: auto; }
+  .bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .bar > div { height: 100%; width: 0; background: #7c3aed; transition: width .2s; }
+</style>
+</head>
+<body>
+  <h3>Nhập PSD từ PSD Figma Studio</h3>
+  <div>Dán "Figma export URL" (lấy trong ứng dụng → nút <b>Xuất Figma</b>):</div>
+  <input id="url" type="text" placeholder="https://.../api/documents/xxx/figma" />
+  <label><input id="raster" type="checkbox" checked /> Kèm ảnh raster gốc của text (ẩn, để đối chiếu)</label>
+  <label><input id="hidden" type="checkbox" checked /> Giữ cả layer đang ẩn</label>
+  <button id="go">Nhập vào Figma</button>
+  <div class="bar"><div id="bar"></div></div>
+  <div id="log"></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const saved = localStorage.getItem('psd-url');
+  if (saved) $('url').value = saved;
+  $('go').onclick = () => {
+    const url = $('url').value.trim();
+    if (!url) return;
+    try { localStorage.setItem('psd-url', url); } catch (e) {}
+    $('go').disabled = true;
+    $('log').textContent = 'Đang bắt đầu…';
+    parent.postMessage({ pluginMessage: { type: 'import', url, raster: $('raster').checked, keepHidden: $('hidden').checked } }, '*');
+  };
+  onmessage = (e) => {
+    const m = e.data.pluginMessage;
+    if (!m) return;
+    if (m.type === 'progress') { $('log').textContent = m.text; if (m.pct != null) $('bar').style.width = m.pct + '%'; }
+    if (m.type === 'done' || m.type === 'error') { $('go').disabled = false; $('log').textContent = m.text; if (m.type === 'done') $('bar').style.width = '100%'; }
+  };
+</script>
+</body>
+</html>
