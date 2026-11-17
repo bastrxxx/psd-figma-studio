@@ -197,9 +197,16 @@ export default function Editor({ id }: { id: string }) {
     try {
       const order = renderOrder(all).map((l) => l.id);
       const nodes = tops.map((t) => byId.get(t)!).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-      const canvas = renderSubset(nodes, all, { width: doc.width, height: doc.height, store: storeRef.current });
+      const canvas = renderSubset(nodes.map((n) => ({ ...n, clipping: false })), all, { width: doc.width, height: doc.height, store: storeRef.current });
       const cropped = cropToContent(canvas);
       const topmost = nodes[nodes.length - 1];
+      // If every merged layer is clipped inside the same parent, keep the result clipped to the same base.
+      const baseOf = (n: Layer) => {
+        const sibs = childrenOf(all, n.parentId);
+        for (let i = sibs.findIndex((s) => s.id === n.id); i >= 0; i--) if (!sibs[i].clipping) return sibs[i].id;
+        return null;
+      };
+      const keepClip = nodes.every((n) => n.clipping) && new Set(nodes.map(baseOf)).size === 1;
       if (!cropped) {
         setLayers((prev) => deleteLayers(prev, tops));
       } else {
@@ -207,7 +214,7 @@ export default function Editor({ id }: { id: string }) {
         const url = await uploadBlob(`docs/${doc.id}/merged-${newId()}.png`, blob, 'image/png');
         const nl: Layer = {
           id: newId('m'), parentId: topmost.parentId, position: topmost.position + 0.5, name: topmost.name, kind: 'pixel',
-          visible: true, opacity: 1, fillOpacity: 1, blendMode: 'normal', clipping: false,
+          visible: true, opacity: 1, fillOpacity: 1, blendMode: 'normal', clipping: keepClip,
           left: cropped.left, top: cropped.top, width: cropped.canvas.width, height: cropped.canvas.height,
           image: { url }, text: null, meta: { merged: true },
         };
